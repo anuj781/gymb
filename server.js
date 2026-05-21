@@ -34,11 +34,24 @@ const app = express()
 
 const allowedOrigins = [
   'http://localhost:5173',
-]
+  process.env.FRONTEND_URL,
+].filter(Boolean)
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin) {
+        return callback(null, true)
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(
+        new Error('CORS Not Allowed')
+      )
+    },
     credentials: true,
   })
 )
@@ -92,8 +105,6 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('✅ User Connected:', socket.id)
 
-  /* PUBLIC CHAT */
-
   socket.on('send_message', async (data) => {
     try {
       if (!data.user || !data.text) return
@@ -118,8 +129,6 @@ io.on('connection', (socket) => {
       console.log('❌ Public Message Error:', error.message)
     }
   })
-
-  /* PRIVATE CHAT */
 
   socket.on('join_private_chat', (conversationId) => {
     if (!conversationId) return
@@ -219,8 +228,6 @@ io.on('connection', (socket) => {
       'private_stop_typing'
     )
   })
-
-  /* PUBLIC TYPING */
 
   socket.on('typing', (name) => {
     socket.broadcast.emit('typing', name)
