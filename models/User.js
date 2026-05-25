@@ -23,6 +23,35 @@ const userSchema = mongoose.Schema(
       required: true,
     },
 
+    /* EMAIL VERIFICATION */
+
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailVerificationToken: {
+      type: String,
+      default: '',
+    },
+
+    emailVerificationExpire: {
+      type: Date,
+      default: null,
+    },
+
+    /* FORGOT PASSWORD */
+
+    resetPasswordToken: {
+      type: String,
+      default: '',
+    },
+
+    resetPasswordExpire: {
+      type: Date,
+      default: null,
+    },
+
     /* PROFILE */
 
     profileImage: {
