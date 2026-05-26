@@ -40,8 +40,6 @@ const sendUserResponse = (user, res) => {
   })
 }
 
-/* REGISTER USER */
-
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body
@@ -55,23 +53,16 @@ export const registerUser = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(password, salt)
 
-    const hashedPassword = await bcrypt.hash(
-      password,
-      salt
-    )
-
-    const verificationToken = crypto
-      .randomBytes(32)
-      .toString('hex')
+    const verificationToken = crypto.randomBytes(32).toString('hex')
 
     const hashedVerificationToken = crypto
       .createHash('sha256')
       .update(verificationToken)
       .digest('hex')
 
-    const isAdmin =
-      email === process.env.ADMIN_EMAIL
+    const isAdmin = email === process.env.ADMIN_EMAIL
 
     const user = await User.create({
       name,
@@ -79,12 +70,8 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
       isAdmin,
       isEmailVerified: isAdmin ? true : false,
-      emailVerificationToken: isAdmin
-        ? ''
-        : hashedVerificationToken,
-      emailVerificationExpire: isAdmin
-        ? null
-        : Date.now() + 24 * 60 * 60 * 1000,
+      emailVerificationToken: isAdmin ? '' : hashedVerificationToken,
+      emailVerificationExpire: isAdmin ? null : Date.now() + 24 * 60 * 60 * 1000,
     })
 
     if (!isAdmin) {
@@ -110,13 +97,13 @@ export const registerUser = async (req, res) => {
         : 'Account created successfully. Please verify your email before login.',
     })
   } catch (error) {
+    console.log('Register Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Register failed',
     })
   }
 }
-
-/* LOGIN USER */
 
 export const loginUser = async (req, res) => {
   try {
@@ -136,10 +123,7 @@ export const loginUser = async (req, res) => {
       })
     }
 
-    const isMatch = await bcrypt.compare(
-      password,
-      user.password
-    )
+    const isMatch = await bcrypt.compare(password, user.password)
 
     if (!isMatch) {
       return res.status(401).json({
@@ -156,13 +140,13 @@ export const loginUser = async (req, res) => {
 
     sendUserResponse(user, res)
   } catch (error) {
+    console.log('Login Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Login failed',
     })
   }
 }
-
-/* VERIFY EMAIL */
 
 export const verifyEmail = async (req, res) => {
   try {
@@ -197,13 +181,13 @@ export const verifyEmail = async (req, res) => {
       message: 'Email verified successfully. You can login now.',
     })
   } catch (error) {
+    console.log('Verify Email Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Email verification failed',
     })
   }
 }
-
-/* RESEND VERIFICATION EMAIL */
 
 export const resendVerificationEmail = async (req, res) => {
   try {
@@ -223,9 +207,7 @@ export const resendVerificationEmail = async (req, res) => {
       })
     }
 
-    const verificationToken = crypto
-      .randomBytes(32)
-      .toString('hex')
+    const verificationToken = crypto.randomBytes(32).toString('hex')
 
     const hashedVerificationToken = crypto
       .createHash('sha256')
@@ -233,8 +215,7 @@ export const resendVerificationEmail = async (req, res) => {
       .digest('hex')
 
     user.emailVerificationToken = hashedVerificationToken
-    user.emailVerificationExpire =
-      Date.now() + 24 * 60 * 60 * 1000
+    user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000
 
     await user.save()
 
@@ -257,13 +238,13 @@ export const resendVerificationEmail = async (req, res) => {
       message: 'Verification email sent successfully',
     })
   } catch (error) {
+    console.log('Resend Verification Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Failed to resend verification email',
     })
   }
 }
-
-/* FORGOT PASSWORD */
 
 export const forgotPassword = async (req, res) => {
   try {
@@ -277,9 +258,7 @@ export const forgotPassword = async (req, res) => {
       })
     }
 
-    const resetToken = crypto
-      .randomBytes(32)
-      .toString('hex')
+    const resetToken = crypto.randomBytes(32).toString('hex')
 
     const hashedResetToken = crypto
       .createHash('sha256')
@@ -287,8 +266,7 @@ export const forgotPassword = async (req, res) => {
       .digest('hex')
 
     user.resetPasswordToken = hashedResetToken
-    user.resetPasswordExpire =
-      Date.now() + 15 * 60 * 1000
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000
 
     await user.save()
 
@@ -311,13 +289,13 @@ export const forgotPassword = async (req, res) => {
       message: 'Password reset email sent successfully',
     })
   } catch (error) {
+    console.log('Forgot Password Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Forgot password failed',
     })
   }
 }
-
-/* RESET PASSWORD */
 
 export const resetPassword = async (req, res) => {
   try {
@@ -343,11 +321,7 @@ export const resetPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10)
-
-    user.password = await bcrypt.hash(
-      password,
-      salt
-    )
+    user.password = await bcrypt.hash(password, salt)
 
     user.resetPasswordToken = ''
     user.resetPasswordExpire = null
@@ -359,19 +333,17 @@ export const resetPassword = async (req, res) => {
       message: 'Password reset successfully. You can login now.',
     })
   } catch (error) {
+    console.log('Reset Password Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Password reset failed',
     })
   }
 }
 
-/* GET MY PROFILE */
-
 export const getMyProfile = async (req, res) => {
   try {
-    const user = await User.findById(
-      req.user._id
-    ).select('-password')
+    const user = await User.findById(req.user._id).select('-password')
 
     if (!user) {
       return res.status(404).json({
@@ -381,8 +353,10 @@ export const getMyProfile = async (req, res) => {
 
     res.json(user)
   } catch (error) {
+    console.log('Get Profile Error:', error)
+
     res.status(500).json({
-      message: error.message,
+      message: error.message || 'Failed to get profile',
     })
   }
 }
