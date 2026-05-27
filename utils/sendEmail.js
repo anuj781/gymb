@@ -1,86 +1,78 @@
 import nodemailer from 'nodemailer'
 
-const sendEmail = async ({
-  to,
-  subject,
-  html,
-}) => {
+const sendEmail = async ({ to, subject, html }) => {
   try {
-    /* CHECK ENV VARIABLES */
+    /* CHECK REQUIRED DATA */
 
-    if (
-      !process.env.EMAIL_USER ||
-      !process.env.EMAIL_PASS
-    ) {
-      console.log(
-        '❌ EMAIL_USER or EMAIL_PASS missing'
-      )
+    if (!to || !subject || !html) {
+      console.log('❌ Missing email data')
 
       return {
         success: false,
-        message:
-          'Email credentials are missing',
+        message: 'Email to, subject or html is missing',
       }
     }
 
-    /* CREATE TRANSPORTER */
+    /* CHECK ENV VARIABLES */
 
-    const transporter =
-      nodemailer.createTransport({
-        service: 'gmail',
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('❌ EMAIL_USER or EMAIL_PASS missing')
 
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      })
+      return {
+        success: false,
+        message: 'EMAIL_USER or EMAIL_PASS missing in environment variables',
+      }
+    }
+
+    /* CREATE GMAIL SMTP TRANSPORTER */
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    })
 
     /* VERIFY SMTP CONNECTION */
 
     await transporter.verify()
 
-    console.log(
-      '✅ Gmail SMTP Connected Successfully'
-    )
+    console.log('✅ Gmail SMTP Connected Successfully')
 
     /* SEND EMAIL */
 
-    const info =
-      await transporter.sendMail({
-        from: `"GYM PRO" <${process.env.EMAIL_USER}>`,
+    const info = await transporter.sendMail({
+      from: `"GYM PRO" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    })
 
-        to,
-
-        subject,
-
-        html,
-      })
-
-    console.log(
-      '✅ Email Sent Successfully:',
-      info.messageId
-    )
+    console.log('✅ Email Sent Successfully:', info.messageId)
 
     return {
       success: true,
       message: 'Email sent successfully',
-      info,
+      messageId: info.messageId,
     }
   } catch (error) {
-    console.log(
-      '❌ Email Sending Error:',
-      error.message
-    )
-
-    /* IMPORTANT:
-       NEVER CRASH THE SERVER
-    */
+    console.log('\n❌ EMAIL SENDING ERROR')
+    console.log('MESSAGE:', error.message)
+    console.log('CODE:', error.code)
+    console.log('COMMAND:', error.command)
+    console.log('RESPONSE:', error.response)
+    console.log('STACK:', error.stack)
 
     return {
       success: false,
-      message:
-        error.message ||
-        'Failed to send email',
+      message: error.message || 'Failed to send email',
+      code: error.code || null,
+      command: error.command || null,
+      response: error.response || null,
     }
   }
 }

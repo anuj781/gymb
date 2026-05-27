@@ -4,7 +4,16 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import sendEmail from '../utils/sendEmail.js'
 
-/* GENERATE JWT TOKEN */
+const logError = (title, error, req) => {
+  console.log(`\n❌ ${title}`)
+  console.log('METHOD:', req?.method)
+  console.log('ROUTE:', req?.originalUrl)
+  console.log('BODY:', req?.body)
+  console.log('MESSAGE:', error?.message)
+  console.log('CODE:', error?.code)
+  console.log('RESPONSE:', error?.response)
+  console.log('STACK:', error?.stack)
+}
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -15,8 +24,6 @@ const generateToken = (id) => {
     }
   )
 }
-
-/* SEND USER RESPONSE */
 
 const sendUserResponse = (user, res) => {
   res.status(200).json({
@@ -60,16 +67,12 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body
 
-    /* VALIDATION */
-
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Please fill all fields',
       })
     }
-
-    /* CHECK USER */
 
     const userExists = await User.findOne({
       email,
@@ -82,30 +85,21 @@ export const registerUser = async (req, res) => {
       })
     }
 
-    /* HASH PASSWORD */
-
     const salt = await bcrypt.genSalt(10)
 
     const hashedPassword =
       await bcrypt.hash(password, salt)
 
-    /* CREATE EMAIL TOKEN */
-
     const verificationToken =
       crypto.randomBytes(32).toString('hex')
 
-    const hashedVerificationToken =
-      crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex')
-
-    /* ADMIN CHECK */
+    const hashedVerificationToken = crypto
+      .createHash('sha256')
+      .update(verificationToken)
+      .digest('hex')
 
     const isAdmin =
       email === process.env.ADMIN_EMAIL
-
-    /* CREATE USER */
 
     const user = await User.create({
       name,
@@ -114,9 +108,7 @@ export const registerUser = async (req, res) => {
 
       isAdmin,
 
-      isEmailVerified: isAdmin
-        ? true
-        : false,
+      isEmailVerified: isAdmin ? true : false,
 
       emailVerificationToken: isAdmin
         ? ''
@@ -124,11 +116,8 @@ export const registerUser = async (req, res) => {
 
       emailVerificationExpire: isAdmin
         ? null
-        : Date.now() +
-          24 * 60 * 60 * 1000,
+        : Date.now() + 24 * 60 * 60 * 1000,
     })
-
-    /* SEND VERIFICATION EMAIL */
 
     if (!isAdmin) {
       try {
@@ -151,6 +140,7 @@ export const registerUser = async (req, res) => {
 
             <a
               href="${verifyUrl}"
+              target="_blank"
               style="
                 display:inline-block;
                 padding:12px 20px;
@@ -169,9 +159,10 @@ export const registerUser = async (req, res) => {
           `,
         })
       } catch (emailError) {
-        console.log(
-          'Verification Email Error:',
-          emailError.message
+        logError(
+          'REGISTER EMAIL ERROR',
+          emailError,
+          req
         )
       }
     }
@@ -186,10 +177,7 @@ export const registerUser = async (req, res) => {
       token: generateToken(user._id),
     })
   } catch (error) {
-    console.log(
-      'Register Error:',
-      error.message
-    )
+    logError('REGISTER ERROR', error, req)
 
     res.status(500).json({
       success: false,
@@ -253,10 +241,7 @@ export const loginUser = async (req, res) => {
 
     sendUserResponse(user, res)
   } catch (error) {
-    console.log(
-      'Login Error:',
-      error.message
-    )
+    logError('LOGIN ERROR', error, req)
 
     res.status(500).json({
       success: false,
@@ -281,8 +266,7 @@ export const verifyEmail = async (
       .digest('hex')
 
     const user = await User.findOne({
-      emailVerificationToken:
-        hashedToken,
+      emailVerificationToken: hashedToken,
 
       emailVerificationExpire: {
         $gt: Date.now(),
@@ -292,30 +276,27 @@ export const verifyEmail = async (
     if (!user) {
       return res.status(400).json({
         success: false,
-
         message:
           'Invalid or expired verification link',
       })
     }
 
     user.isEmailVerified = true
-
     user.emailVerificationToken = ''
-
     user.emailVerificationExpire = null
 
     await user.save()
 
     res.status(200).json({
       success: true,
-
       message:
         'Email verified successfully. You can login now.',
     })
   } catch (error) {
-    console.log(
-      'Verify Email Error:',
-      error.message
+    logError(
+      'VERIFY EMAIL ERROR',
+      error,
+      req
     )
 
     res.status(500).json({
@@ -354,9 +335,7 @@ export const resendVerificationEmail =
       }
 
       const verificationToken =
-        crypto
-          .randomBytes(32)
-          .toString('hex')
+        crypto.randomBytes(32).toString('hex')
 
       const hashedVerificationToken =
         crypto
@@ -368,8 +347,7 @@ export const resendVerificationEmail =
         hashedVerificationToken
 
       user.emailVerificationExpire =
-        Date.now() +
-        24 * 60 * 60 * 1000
+        Date.now() + 24 * 60 * 60 * 1000
 
       await user.save()
 
@@ -388,11 +366,12 @@ export const resendVerificationEmail =
             <p>Hello ${user.name},</p>
 
             <p>
-              Click the button below to verify your email:
+              Click the link below to verify your email:
             </p>
 
             <a
               href="${verifyUrl}"
+              target="_blank"
               style="
                 display:inline-block;
                 padding:12px 20px;
@@ -411,9 +390,10 @@ export const resendVerificationEmail =
           `,
         })
       } catch (emailError) {
-        console.log(
-          'Resend Verification Error:',
-          emailError.message
+        logError(
+          'RESEND VERIFICATION EMAIL ERROR',
+          emailError,
+          req
         )
       }
 
@@ -424,9 +404,10 @@ export const resendVerificationEmail =
           'Verification email sent successfully',
       })
     } catch (error) {
-      console.log(
-        'Resend Verification Error:',
-        error.message
+      logError(
+        'RESEND VERIFICATION ERROR',
+        error,
+        req
       )
 
       res.status(500).json({
@@ -460,17 +441,14 @@ export const forgotPassword = async (
     }
 
     const resetToken =
-      crypto.randomBytes(32).toString(
-        'hex'
-      )
+      crypto.randomBytes(32).toString('hex')
 
     const hashedResetToken = crypto
       .createHash('sha256')
       .update(resetToken)
       .digest('hex')
 
-    user.resetPasswordToken =
-      hashedResetToken
+    user.resetPasswordToken = hashedResetToken
 
     user.resetPasswordExpire =
       Date.now() + 15 * 60 * 1000
@@ -497,6 +475,7 @@ export const forgotPassword = async (
 
           <a
             href="${resetUrl}"
+            target="_blank"
             style="
               display:inline-block;
               padding:12px 20px;
@@ -515,9 +494,10 @@ export const forgotPassword = async (
         `,
       })
     } catch (emailError) {
-      console.log(
-        'Forgot Password Email Error:',
-        emailError.message
+      logError(
+        'FORGOT PASSWORD EMAIL ERROR',
+        emailError,
+        req
       )
     }
 
@@ -528,9 +508,10 @@ export const forgotPassword = async (
         'Password reset email sent successfully',
     })
   } catch (error) {
-    console.log(
-      'Forgot Password Error:',
-      error.message
+    logError(
+      'FORGOT PASSWORD ERROR',
+      error,
+      req
     )
 
     res.status(500).json({
@@ -551,7 +532,6 @@ export const resetPassword = async (
 ) => {
   try {
     const { token } = req.params
-
     const { password } = req.body
 
     const hashedToken = crypto
@@ -560,8 +540,7 @@ export const resetPassword = async (
       .digest('hex')
 
     const user = await User.findOne({
-      resetPasswordToken:
-        hashedToken,
+      resetPasswordToken: hashedToken,
 
       resetPasswordExpire: {
         $gt: Date.now(),
@@ -571,7 +550,6 @@ export const resetPassword = async (
     if (!user) {
       return res.status(400).json({
         success: false,
-
         message:
           'Invalid or expired reset link',
       })
@@ -585,21 +563,20 @@ export const resetPassword = async (
     )
 
     user.resetPasswordToken = ''
-
     user.resetPasswordExpire = null
 
     await user.save()
 
     res.status(200).json({
       success: true,
-
       message:
         'Password reset successfully. You can login now.',
     })
   } catch (error) {
-    console.log(
-      'Reset Password Error:',
-      error.message
+    logError(
+      'RESET PASSWORD ERROR',
+      error,
+      req
     )
 
     res.status(500).json({
@@ -635,9 +612,10 @@ export const getMyProfile = async (
       user,
     })
   } catch (error) {
-    console.log(
-      'Get Profile Error:',
-      error.message
+    logError(
+      'GET PROFILE ERROR',
+      error,
+      req
     )
 
     res.status(500).json({
