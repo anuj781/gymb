@@ -6,22 +6,28 @@ const sendEmail = async ({
   html,
 }) => {
   try {
+    /* CHECK ENV VARIABLES */
+
     if (
       !process.env.EMAIL_USER ||
       !process.env.EMAIL_PASS
     ) {
-      throw new Error(
-        'EMAIL_USER or EMAIL_PASS missing in environment variables'
+      console.log(
+        '❌ EMAIL_USER or EMAIL_PASS missing'
       )
+
+      return {
+        success: false,
+        message:
+          'Email credentials are missing',
+      }
     }
+
+    /* CREATE TRANSPORTER */
 
     const transporter =
       nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-
-        port: 465,
-
-        secure: true,
+        service: 'gmail',
 
         auth: {
           user: process.env.EMAIL_USER,
@@ -29,11 +35,15 @@ const sendEmail = async ({
         },
       })
 
+    /* VERIFY SMTP CONNECTION */
+
     await transporter.verify()
 
     console.log(
       '✅ Gmail SMTP Connected Successfully'
     )
+
+    /* SEND EMAIL */
 
     const info =
       await transporter.sendMail({
@@ -47,20 +57,31 @@ const sendEmail = async ({
       })
 
     console.log(
-      '✅ Email Sent:',
+      '✅ Email Sent Successfully:',
       info.messageId
     )
 
-    return info
+    return {
+      success: true,
+      message: 'Email sent successfully',
+      info,
+    }
   } catch (error) {
     console.log(
       '❌ Email Sending Error:',
-      error
+      error.message
     )
 
-    throw new Error(
-      error.message || 'Failed to send email'
-    )
+    /* IMPORTANT:
+       NEVER CRASH THE SERVER
+    */
+
+    return {
+      success: false,
+      message:
+        error.message ||
+        'Failed to send email',
+    }
   }
 }
 
